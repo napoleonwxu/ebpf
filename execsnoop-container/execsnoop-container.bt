@@ -1,0 +1,25 @@
+#!/usr/bin/env bpftrace
+/* Tracing execve and execveat with container pidns and uts name. */
+
+#include <linux/sched.h>
+#include <linux/nsproxy.h>
+#include <linux/utsname.h>
+#include <linux/pid_namespace.h>
+#include <net/net_namespace.h>
+
+BEGIN {
+  printf("%-12s %-8s %-6s %-6s %-8s %s\n", "PID/NET NS", "CONTAINER", "PPID", "PID", "COMM", "ARGS");
+}
+
+tracepoint:syscalls:sys_enter_execve {
+  /* 1. 获取task_struct结构体 */
+  $task = (struct task_struct *)curtask;
+  /* 2. 获取PID&NET命名空间 */
+  $pidns = $task->nsproxy->pid_ns_for_children->ns.inum;
+  $netns = $task->nsproxy->net_ns->ns.inum;
+  /* 3. 获取主机名 */
+  $cname = $task->nsproxy->uts_ns->name.nodename;
+  /* 4. 输出PID/NET命名空间、主机名和进程基本信息 */
+  //printf("%-12ld %-8s %-6d %-6d %-8s", (uint64)$pidns, $cname, curtask->parent->pid, pid, comm); join(args->argv);
+  printf("%-12ld %-8s %-6d %-6d %-8s", (uint64)$netns, $cname, curtask->parent->pid, pid, comm); join(args->argv);
+}
